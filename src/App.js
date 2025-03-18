@@ -6,7 +6,7 @@ import { tr } from 'date-fns/locale';
 import AdminPanel from './components/AdminPanel';
 import CustomerView from './components/CustomerView';
 import Login from './components/Login';
-import { auth } from './firebase.js';
+import { auth } from './firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 
 function App() {
