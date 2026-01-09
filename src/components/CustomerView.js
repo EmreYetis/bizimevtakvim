@@ -11,7 +11,7 @@ import {
   TableHead, 
   TableRow, 
   IconButton,
-  Divider,
+  Tooltip,
   useTheme,
   alpha
 } from '@mui/material';
@@ -31,6 +31,7 @@ const rooms = [
   'Hurmalıbük',
   'Kızılbük',
   'Değirmenbükü',
+  'Yamaç ev',
   'İskaroz',
   'İskorpit',
   'Lopa'
@@ -90,10 +91,62 @@ function CustomerView() {
   // Ayın açık olup olmadığını kontrol et
   const isMonthOpen = (date) => {
     const yearMonth = format(date, 'yyyy-MM');
-    return monthAvailability[yearMonth]?.isOpen !== false; // Varsayılan olarak açık
+    return monthAvailability[yearMonth]?.isOpen === true; // Sadece açık işaretlenen aylar
+  };
+
+  const getFirstFutureOpenMonth = () => {
+    const todayMonth = startOfMonth(new Date());
+    const openMonths = Object.keys(monthAvailability)
+      .filter(key => monthAvailability[key]?.isOpen === true)
+      .map(key => new Date(`${key}-01`))
+      .filter(date => !isPastDate(endOfMonth(date)))
+      .sort((a, b) => a - b);
+    return openMonths[0] || null;
+  };
+
+  // Verilen tarihten sonraki/kendisi dahil ilk açık ayı bul
+  const findNextOpenMonth = (date) => {
+    let cursor = startOfMonth(date);
+    for (let i = 0; i < 24; i++) { // 2 yıl ileriye kadar dene
+      const yearMonth = cursor;
+      if (!isPastDate(endOfMonth(yearMonth)) && isMonthOpen(yearMonth)) {
+        return yearMonth;
+      }
+      cursor = addMonths(cursor, 1);
+    }
+    return null;
+  };
+
+  // Verilen tarihten önceki açık ayı bul
+  const findPrevOpenMonth = (date) => {
+    let cursor = startOfMonth(date);
+    for (let i = 0; i < 24; i++) { // 2 yıl geriye kadar dene
+      cursor = addMonths(cursor, -1);
+      if (!isPastDate(endOfMonth(cursor)) && isMonthOpen(cursor)) {
+        return cursor;
+      }
+    }
+    return null;
   };
 
   // isDateBooked fonksiyonunu güncelle
+  const getBookingEntry = (date, room) => {
+    const dateStr = date.toISOString().split('T')[0];
+    const entry = bookedDates[dateStr];
+    if (!entry || !Array.isArray(entry.rooms)) return null;
+    // Hem eski string listesi hem yeni obje listesi destekleniyor
+    const found = entry.rooms.find(item => {
+      if (typeof item === 'string') return item === room;
+      if (typeof item === 'object' && item?.room === room) return true;
+      return false;
+    });
+    if (!found) return null;
+    if (typeof found === 'string') {
+      return { room: found };
+    }
+    return found;
+  };
+
   const isDateBooked = (date, room) => {
     // Önce tarihin geçmiş olup olmadığını kontrol et
     if (isPastDate(date)) {
@@ -105,55 +158,134 @@ function CustomerView() {
       return true; // Kapalı aylar için true döndür (rezerve gibi görünsün)
     }
 
-    // Normal rezervasyon kontrolü
-    const dateStr = date.toISOString().split('T')[0];
-    return bookedDates[dateStr]?.rooms?.includes(room);
+    return !!getBookingEntry(date, room);
   };
 
   // Hücre rengi için yeni bir fonksiyon
   const getCellColor = (date, room) => {
     if (isPastDate(date)) {
-      // Geçmiş tarihler için farklı bir renk
       return alpha(theme.palette.grey[500], 0.9);
     }
     if (!isMonthOpen(date)) {
-      // Kapalı aylar için farklı bir renk
       return alpha(theme.palette.warning.main, 0.8);
     }
-    if (isDateBooked(date, room)) {
-      // Normal rezervasyonlar için kırmızı
-      return alpha(theme.palette.error.main, 0.9);
+    const booking = getBookingEntry(date, room);
+    if (booking) {
+      if (booking.guestName) {
+        return alpha(theme.palette.success.main, 0.65); // Rezervasyon
+      }
+      return alpha(theme.palette.error.main, 0.9); // Boş blokaj
     }
     if (isWeekend(date)) {
-      // Hafta sonları için mevcut renk
       return alpha(theme.palette.primary.main, 0.05);
     }
     return 'transparent';
   };
 
+  const formatDateLabel = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      return format(new Date(dateStr), 'dd MMM yyyy', { locale: tr });
+    } catch (error) {
+      return dateStr;
+    }
+  };
+
+  const renderBookingTooltip = (booking) => {
+    if (!booking) return '';
+    if (!booking.guestName) {
+      return (
+        <Box sx={{ p: 1.5 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+            Kapalı / Blokaj
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            Bu tarih bilgilendirme amaçlı kapatılmıştır.
+          </Typography>
+        </Box>
+      );
+    }
+
+    const stayLabel = booking.stayStart && booking.stayEnd
+      ? `${formatDateLabel(booking.stayStart)} - ${formatDateLabel(booking.stayEnd)}${booking.stayLengthDays ? ` · ${booking.stayLengthDays} gece` : ''}`
+      : null;
+
+    return (
+      <Box sx={{ p: 1.5, minWidth: 220 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+          {booking.guestName}
+        </Typography>
+        {(typeof booking.adultCount === 'number' || typeof booking.childCount === 'number') && (
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
+            {booking.adultCount ? `${booking.adultCount} yetişkin` : ''}
+            {booking.adultCount && booking.childCount ? ' · ' : ''}
+            {booking.childCount ? `${booking.childCount} çocuk` : ''}
+          </Typography>
+        )}
+        {booking.guestPhone && (
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
+            Tel: {booking.guestPhone}
+          </Typography>
+        )}
+        {stayLabel && (
+          <Typography variant="body2" sx={{ mb: 0.5 }}>
+            Konaklama: {stayLabel}
+          </Typography>
+        )}
+        <Typography variant="body2" sx={{ mb: 0.25 }}>
+          Ödenecek: {booking.amountDue ? `${booking.amountDue} ₺` : '-'}
+        </Typography>
+        <Typography variant="body2" sx={{ mb: 0.25 }}>
+          Ödenen: {booking.amountPaid ? `${booking.amountPaid} ₺` : '-'}
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          Ödeme Tarihi: {booking.paymentDate ? formatDateLabel(booking.paymentDate) : 'Belirtilmedi'}
+        </Typography>
+        {booking.note && (
+          <Typography variant="body2" sx={{ mt: 0.5 }}>
+            Not: {booking.note}
+          </Typography>
+        )}
+      </Box>
+    );
+  };
+
   const handlePrevMonth = () => {
-    setStartDate(date => {
-      const newDate = addMonths(date, -1);
-      if (isPastDate(endOfMonth(newDate))) {
-        return date;
-      }
-      return newDate;
-    });
+    const prevOpen = findPrevOpenMonth(startDate);
+    if (prevOpen) {
+      setStartDate(prevOpen);
+    }
   };
 
   const handleNextMonth = () => {
-    setStartDate(date => addMonths(date, 1));
+    const nextOpen = findNextOpenMonth(addMonths(startDate, 1));
+    if (nextOpen) {
+      setStartDate(nextOpen);
+    }
   };
 
   const isPrevMonthDisabled = () => {
-    const prevMonth = addMonths(startDate, -1);
-    return isPastDate(endOfMonth(prevMonth));
+    return !findPrevOpenMonth(startDate);
   };
 
-  const dateRange = eachDayOfInterval({
-    start: startDate,
-    end: endOfMonth(addMonths(startDate, 1))
-  });
+  // Açık ayları (en fazla 2 ay) hesapla
+  const visibleMonths = (() => {
+    const firstOpen = isMonthOpen(startDate) && !isPastDate(endOfMonth(startDate))
+      ? startDate
+      : findNextOpenMonth(startDate) || getFirstFutureOpenMonth() || startDate;
+
+    const months = [firstOpen];
+    const next = findNextOpenMonth(addMonths(firstOpen, 1));
+    if (next) months.push(next);
+    return months;
+  })();
+
+  const dateRange = visibleMonths.flatMap(month =>
+    eachDayOfInterval({
+      start: startOfMonth(month),
+      end: endOfMonth(month)
+    })
+  );
 
   // Tablo scroll olayını dinle
   const handleScroll = useCallback((e) => {
@@ -236,6 +368,14 @@ function CustomerView() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Ay verisi yüklendiğinde başlangıç ayını açık aya ayarla
+  useEffect(() => {
+    if (isMonthOpen(startDate) && !isPastDate(endOfMonth(startDate))) return;
+
+    const firstOpen = getFirstFutureOpenMonth();
+    if (firstOpen) setStartDate(firstOpen);
+  }, [monthAvailability]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2, md: 3 } }}>
       <Box sx={{ 
@@ -251,271 +391,27 @@ function CustomerView() {
           flexDirection: 'column',
           alignItems: 'center',
           textAlign: 'center',
-          mb: { xs: 1, sm: 2 }
+          mb: { xs: 2, sm: 3 }
         }}>
-                     <Typography 
-             variant="h3" 
-             sx={{ 
-               fontWeight: 700,
-               color: theme.palette.primary.main,
-               mb: 1,
-               fontSize: { xs: '1.75rem', sm: '2.5rem', md: '3rem' }
-             }}
-           >
-             🏠 Bizim Ev Datça
-           </Typography>
-
-          <Divider sx={{ width: '100%', mb: { xs: 2, sm: 3 } }} />
-        </Box>
-
-        {/* Drone Image and Pricing Section */}
-        <Box sx={{ 
-          display: 'flex', 
-          flexDirection: { xs: 'column', lg: 'row' },
-          gap: { xs: 2, sm: 3 },
-          mb: { xs: 2, sm: 3 },
-          px: { xs: 1, sm: 2 }
-        }}>
-                     {/* Drone Image */}
-           <Box sx={{
-             flex: { lg: '1 1 65%' },
-             display: 'flex',
-             justifyContent: 'center'
-           }}>
-                         <Box sx={{
-               position: 'relative',
-               width: '100%',
-               maxWidth: { xs: '100%', sm: '700px', md: '800px' },
-               height: { xs: '400px', sm: '500px', md: '600px' },
-               borderRadius: 4,
-               overflow: 'hidden',
-               boxShadow: theme.shadows[4],
-               backgroundColor: '#f5f5f5',
-               transition: 'all 0.3s ease-in-out',
-               '&:hover': {
-                 transform: 'scale(1.02)',
-                 boxShadow: theme.shadows[8],
-               }
-             }}>
-                               <img 
-                  src="/images/drone-view.jpeg" 
-                  alt="Bizim Ev Datça Drone Görüntüsü"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'contain',
-                    display: 'block',
-                    backgroundColor: '#f5f5f5'
-                  }}
-                />
-              {/* Overlay with gradient for better text readability */}
-              <Box sx={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                background: 'linear-gradient(transparent, rgba(0,0,0,0.3))',
-                height: '30%',
-                pointerEvents: 'none'
-              }} />
-            </Box>
-          </Box>
-
-                     {/* Pricing Table */}
-           <Box sx={{
-             flex: { lg: '1 1 35%' },
-             display: 'flex',
-             justifyContent: 'center',
-             alignItems: 'flex-start'
-           }}>
-                         <Paper sx={{
-               p: { xs: 2, sm: 3 },
-               borderRadius: 3,
-               boxShadow: theme.shadows[6],
-               backgroundColor: alpha(theme.palette.primary.main, 0.05),
-               border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-               width: '100%',
-               maxWidth: { xs: '100%', sm: '500px', md: '550px' }
-             }}>
-              <Typography 
-                variant="h5" 
-                sx={{ 
-                  fontWeight: 700,
-                  color: theme.palette.primary.main,
-                  mb: 2,
-                  textAlign: 'center',
-                  fontSize: { xs: '1.25rem', sm: '1.5rem' }
-                }}
-              >
-                💰 Fiyat Bilgileri
-              </Typography>
-
-              {/* Ağustos Fiyatları */}
-              <Box sx={{ mb: 3 }}>
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    fontWeight: 600,
-                    color: theme.palette.text.primary,
-                    mb: 1,
-                    fontSize: { xs: '1rem', sm: '1.1rem' }
-                  }}
-                >
-                  🌞 Ağustos Ayı
-                </Typography>
-                <Box sx={{ 
-                  backgroundColor: alpha(theme.palette.success.main, 0.1),
-                  borderRadius: 2,
-                  p: 2,
-                  border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`
-                }}>
-                  <Typography sx={{ 
-                    fontSize: { xs: '0.9rem', sm: '1rem' },
-                    fontWeight: 600,
-                    color: theme.palette.success.main,
-                    mb: 1
-                  }}>
-                    Tüm Odalar: 23.000 ₺
-                  </Typography>
-                  <Typography sx={{ 
-                    fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                    color: theme.palette.text.secondary,
-                    mb: 1
-                  }}>
-                    • 2 kişi + Kahvaltı 
-                  </Typography>
-                  <Typography sx={{ 
-                    fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                    color: theme.palette.text.secondary,
-                    mb: 1
-                  }}>
-                    • 12 yaş ve üstü: +5.000 ₺/kişi
-                  </Typography>
-                                     <Typography sx={{ 
-                     fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                     color: theme.palette.text.secondary,
-                     mb: 1
-                   }}>
-                     • 12 yaş altı: Ücretsiz
-                   </Typography>
-                   <Typography sx={{ 
-                    fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                    color: theme.palette.warning.main,
-                    fontWeight: 600
-                  }}>
-                                         ⚠️ Maksimum 2 kişi (1,2,3,10 ve 11 Numaralı Odalar)
-                                         </Typography>
-                  <Typography sx={{ 
-                    fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                    color: theme.palette.warning.main,
-                    fontWeight: 600
-                  }}>
-                                      
-                                         ⚠️ Maksimum 4 kişi (4,5,6,7,8 ve 9 Numaralı Odalar)
-                  </Typography>
-                </Box>
-              </Box>
-
-              {/* Eylül-Ekim Fiyatları */}
-              <Box>
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    fontWeight: 600,
-                    color: theme.palette.text.primary,
-                    mb: 1,
-                    fontSize: { xs: '1rem', sm: '1.1rem' }
-                  }}
-                >
-                  🍂 Eylül - Ekim Ayı
-                </Typography>
-                <Box sx={{ 
-                  backgroundColor: alpha(theme.palette.info.main, 0.1),
-                  borderRadius: 2,
-                  p: 2,
-                  border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
-                }}>
-                  <Typography sx={{ 
-                    fontSize: { xs: '0.9rem', sm: '1rem' },
-                    fontWeight: 600,
-                    color: theme.palette.info.main,
-                    mb: 1
-                  }}>
-                    Tüm Odalar: 18.000 ₺
-                  </Typography>
-                  <Typography sx={{ 
-                    fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                    color: theme.palette.text.secondary,
-                    mb: 1
-                  }}>
-                    • 2 kişi + Kahvaltı 
-                  </Typography>
-                  <Typography sx={{ 
-                    fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                    color: theme.palette.text.secondary,
-                    mb: 1
-                  }}>
-                    • 12 yaş üstü: +2.000 ₺/kişi
-                  </Typography>
-                  <Typography sx={{ 
-                    fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                    color: theme.palette.text.secondary,
-                    mb: 1
-                  }}>
-                    • 12 yaş altı: Ücretsiz
-                  </Typography>
-                  <Typography sx={{ 
-                    fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                    color: theme.palette.warning.main,
-                    fontWeight: 600
-                  }}>
-                                         ⚠️ Maksimum 2 kişi (1,2,3,10 ve 11 Numaralı Odalar)
-                                         </Typography>
-                  <Typography sx={{ 
-                    fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                    color: theme.palette.warning.main,
-                    fontWeight: 600
-                  }}>
-                                      
-                                         ⚠️ Maksimum 4 kişi (4,5,6,7,8 ve 9 Numaralı Odalar)
-                  </Typography>
-                </Box>
-              </Box>
-
-                             {/* Önemli Notlar */}
-               <Box sx={{ 
-                 mt: 2,
-                 p: 2,
-                 backgroundColor: alpha(theme.palette.warning.main, 0.1),
-                 borderRadius: 2,
-                 border: `1px solid ${alpha(theme.palette.warning.main, 0.2)}`
-               }}>
-                 <Typography sx={{ 
-                   fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                   color: theme.palette.warning.main,
-                   fontWeight: 600,
-                   mb: 1
-                 }}>
-                   📋 Önemli Bilgiler
-                 </Typography>
-                 <Typography sx={{ 
-                   fontSize: { xs: '0.75rem', sm: '0.8rem' },
-                   color: theme.palette.text.secondary,
-                   mb: 0.5
-                 }}>
-                   • 12 yaş üstü kişiler yetişkin kabul edilir
-                 </Typography>
-                 <Typography sx={{ 
-                   fontSize: { xs: '0.75rem', sm: '0.8rem' },
-                   color: theme.palette.text.secondary,
-                   mb: 0.5
-                 }}>
-                   • 4 Kişi Kapasiteli Odalar: 2 Yetişkin + 2 Çocuk Kapasitelidir
-                 </Typography>
-
-               </Box>
-            </Paper>
-          </Box>
+          <Typography 
+            variant="h3" 
+            sx={{ 
+              fontWeight: 700,
+              color: theme.palette.primary.main,
+              fontSize: { xs: '1.75rem', sm: '2.5rem', md: '3rem' }
+            }}
+          >
+            🏠 Bizim Ev Datça
+          </Typography>
+          <Typography 
+            variant="subtitle1" 
+            sx={{ 
+              color: theme.palette.text.secondary,
+              mt: 1
+            }}
+          >
+            Rezervasyon takvimi
+          </Typography>
         </Box>
 
         {/* Calendar Navigation */}
@@ -556,7 +452,7 @@ function CustomerView() {
               gap: { xs: 1, sm: 2 }
             }}>
               <MonthIndicator 
-                date={startDate} 
+                date={visibleMonths[0] || startDate} 
                 isActive={activeMonth === 0}
               />
               
@@ -570,8 +466,8 @@ function CustomerView() {
               </Typography>
               
               <MonthIndicator 
-                date={addMonths(startDate, 1)} 
-                isActive={activeMonth === 1}
+                date={visibleMonths[1] || addMonths(visibleMonths[0] || startDate, 1)} 
+                isActive={activeMonth === 1 && !!visibleMonths[1]}
               />
             </Box>
 
@@ -725,30 +621,9 @@ function CustomerView() {
                   >
                     {room}
                   </TableCell>
-                  {dateRange.map(date => (
-                    <TableCell 
-                      key={date.toISOString()}
-                      align="center"
-                      sx={{
-                        backgroundColor: getCellColor(date, room),
-                        borderLeft: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
-                        width: { 
-                          xs: '35px', 
-                          sm: '45px',
-                          md: `${cellWidth}px`
-                        },
-                        cursor: isPastDate(date) ? 'not-allowed' : 'pointer',
-                        '&:hover': {
-                          backgroundColor: isPastDate(date) 
-                            ? alpha(theme.palette.grey[500], 0.8)  // Geçmiş tarihler için hover rengi
-                            : isDateBooked(date, room)
-                              ? alpha(theme.palette.error.main, 0.8)  // Rezerve günler için hover rengi
-                              : alpha(theme.palette.primary.main, 0.1)  // Boş günler için hover rengi
-                        },
-                        position: 'relative'
-                      }}
-                    >
-                      {/* Hücre içeriği */}
+                  {dateRange.map(date => {
+                    const booking = getBookingEntry(date, room);
+                    const innerContent = (
                       <Box sx={{
                         width: '100%',
                         height: '100%',
@@ -764,7 +639,7 @@ function CustomerView() {
                           }}>
                             •
                           </Typography>
-                        ) : isDateBooked(date, room) ? (
+                        ) : booking ? (
                           <Typography sx={{ 
                             fontSize: '0.7rem', 
                             color: 'white' 
@@ -773,8 +648,46 @@ function CustomerView() {
                           </Typography>
                         ) : null}
                       </Box>
-                    </TableCell>
-                  ))}
+                    );
+
+                    return (
+                      <TableCell 
+                        key={date.toISOString()}
+                        align="center"
+                        sx={{
+                          backgroundColor: getCellColor(date, room),
+                          borderLeft: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
+                          width: { 
+                            xs: '35px', 
+                            sm: '45px',
+                            md: `${cellWidth}px`
+                          },
+                          cursor: isPastDate(date) ? 'not-allowed' : 'pointer',
+                          '&:hover': {
+                            backgroundColor: isPastDate(date) 
+                              ? alpha(theme.palette.grey[500], 0.8)
+                              : isDateBooked(date, room)
+                                ? alpha(theme.palette.error.main, 0.8)
+                                : alpha(theme.palette.primary.main, 0.1)
+                          },
+                          position: 'relative'
+                        }}
+                      >
+                        {booking ? (
+                          <Tooltip 
+                            title={renderBookingTooltip(booking)}
+                            placement="top"
+                            arrow
+                            enterDelay={150}
+                          >
+                            <Box sx={{ width: '100%', height: '100%' }}>
+                              {innerContent}
+                            </Box>
+                          </Tooltip>
+                        ) : innerContent}
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               ))}
             </TableBody>
@@ -789,17 +702,28 @@ function CustomerView() {
            gap: { xs: 2, sm: 4 },
            mt: { xs: 1, sm: 2 }
          }}>
-           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-             <Box sx={{ 
-               width: { xs: 12, sm: 16 }, 
-               height: { xs: 12, sm: 16 }, 
-               backgroundColor: alpha(theme.palette.error.main, 0.9),
-               borderRadius: '50%' 
-             }} />
-             <Typography variant="body2" color="text.secondary">
-               Rezerve
-             </Typography>
-           </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ 
+              width: { xs: 12, sm: 16 }, 
+              height: { xs: 12, sm: 16 }, 
+              backgroundColor: alpha(theme.palette.success.main, 0.7),
+              borderRadius: '50%' 
+            }} />
+            <Typography variant="body2" color="text.secondary">
+              Rezervasyon
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ 
+              width: { xs: 12, sm: 16 }, 
+              height: { xs: 12, sm: 16 }, 
+              backgroundColor: alpha(theme.palette.error.main, 0.9),
+              borderRadius: '50%' 
+            }} />
+            <Typography variant="body2" color="text.secondary">
+              Blokaj (Bilgi yok)
+            </Typography>
+          </Box>
            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
              <Box sx={{ 
                width: { xs: 12, sm: 16 }, 
@@ -811,17 +735,17 @@ function CustomerView() {
                Geçmiş Tarih
              </Typography>
            </Box>
-           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-             <Box sx={{ 
-               width: { xs: 12, sm: 16 }, 
-               height: { xs: 12, sm: 16 }, 
-               backgroundColor: alpha(theme.palette.warning.main, 0.8),
-               borderRadius: '50%' 
-             }} />
-             <Typography variant="body2" color="text.secondary">
-               Kapalı Ay
-             </Typography>
-           </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ 
+              width: { xs: 12, sm: 16 }, 
+              height: { xs: 12, sm: 16 }, 
+              backgroundColor: alpha(theme.palette.warning.main, 0.8),
+              borderRadius: '50%' 
+            }} />
+            <Typography variant="body2" color="text.secondary">
+              Kapalı Ay
+            </Typography>
+          </Box>
            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
              <Box sx={{ 
                width: { xs: 12, sm: 16 }, 
