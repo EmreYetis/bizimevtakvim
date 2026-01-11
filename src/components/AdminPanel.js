@@ -652,7 +652,7 @@ function AdminPanel() {
   // Rezervasyon ekleme/güncelleme işleyicisi
   const handleAddReservation = async () => {
     if (selectedCells.length === 0) {
-      alert('Lütfen en az bir hücre seçin');
+      alert('Lütfen önce tarih seçin');
       return;
     }
 
@@ -841,11 +841,11 @@ function AdminPanel() {
 
 
 
-  // Tek aylık tarih aralığını oluştur
+  // 10 Şubat 2026 - 31 Mart 2026 tarih aralığını oluştur
   const dateRange = useMemo(() => eachDayOfInterval({
-    start: startDate,
-    end: endOfMonth(addMonths(startDate, 1))
-  }), [startDate]);
+    start: new Date('2026-02-10'),
+    end: new Date('2026-03-31')
+  }), []);
 
   return (
     <Container maxWidth="xl">
@@ -871,113 +871,6 @@ function AdminPanel() {
           </Button>
         </Box>
 
-        {/* Month Availability Control Panel */}
-        <Paper
-          elevation={2}
-          sx={{
-            p: { xs: 2, sm: 3 },
-            mb: { xs: 2, sm: 3 },
-            backgroundColor: alpha(theme.palette.info.main, 0.05),
-            border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
-          }}
-        >
-          <Typography 
-            variant="h6" 
-            sx={{ 
-              fontWeight: 600,
-              color: theme.palette.info.main,
-              mb: 2,
-              textAlign: 'center'
-            }}
-          >
-            📅 Ay Bazlı Rezervasyon Kontrolü
-          </Typography>
-          
-          <Box sx={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 2,
-            justifyContent: 'center'
-          }}>
-            {Array.from({ length: 12 }, (_, i) => {
-              const date = addMonths(new Date(), i);
-              const yearMonth = format(date, 'yyyy-MM');
-              const isOpen = monthAvailability[yearMonth]?.isOpen !== false;
-              
-              return (
-                <Box
-                  key={yearMonth}
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    p: 2,
-                    borderRadius: 2,
-                    backgroundColor: isOpen 
-                      ? alpha(theme.palette.success.main, 0.1)
-                      : alpha(theme.palette.error.main, 0.1),
-                    border: `2px solid ${isOpen 
-                      ? theme.palette.success.main 
-                      : theme.palette.error.main}`,
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'scale(1.05)',
-                      boxShadow: theme.shadows[4]
-                    }
-                  }}
-                  onClick={() => toggleMonthAvailability(yearMonth)}
-                >
-                  <Typography 
-                    sx={{ 
-                      fontWeight: 600,
-                      color: isOpen 
-                        ? theme.palette.success.main 
-                        : theme.palette.error.main,
-                      fontSize: { xs: '0.9rem', sm: '1rem' }
-                    }}
-                  >
-                    {format(date, 'MMMM', { locale: tr })}
-                  </Typography>
-                  <Typography 
-                    sx={{ 
-                      fontSize: { xs: '0.7rem', sm: '0.8rem' },
-                      color: theme.palette.text.secondary
-                    }}
-                  >
-                    {format(date, 'yyyy')}
-                  </Typography>
-                  <Box sx={{
-                    mt: 1,
-                    px: 2,
-                    py: 0.5,
-                    borderRadius: 1,
-                    backgroundColor: isOpen 
-                      ? theme.palette.success.main 
-                      : theme.palette.error.main,
-                    color: 'white',
-                    fontSize: { xs: '0.7rem', sm: '0.8rem' },
-                    fontWeight: 600
-                  }}>
-                    {isOpen ? '✅ Açık' : '❌ Kapalı'}
-                  </Box>
-                </Box>
-              );
-            })}
-          </Box>
-          
-          <Typography 
-            variant="body2" 
-            sx={{ 
-              mt: 2,
-              textAlign: 'center',
-              color: theme.palette.text.secondary,
-              fontSize: { xs: '0.75rem', sm: '0.8rem' }
-            }}
-          >
-            💡 Aylara tıklayarak rezervasyon durumunu değiştirebilirsiniz. Kapalı aylar müşteri tarafında görünmez.
-          </Typography>
-        </Paper>
 
         {/* Rezervasyon Listesi */}
         <Paper
@@ -1228,7 +1121,7 @@ function AdminPanel() {
           </Box>
         </Paper>
 
-        {/* Month Navigation */}
+        {/* Tarih Aralığı Bilgisi */}
         <Box sx={{
           display: 'flex',
           justifyContent: 'center',
@@ -1240,217 +1133,25 @@ function AdminPanel() {
           borderRadius: 2,
           p: 2
         }}>
-          <IconButton
-            onClick={handlePrevMonth}
-            disabled={isPrevMonthDisabled()}
-            sx={{
-              color: theme.palette.primary.main,
-              '&.Mui-disabled': {
-                color: theme.palette.action.disabled
-              },
-              '&:hover': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.1)
-              }
-            }}
-          >
-            <ChevronLeftIcon />
-          </IconButton>
           <Typography
             variant="h6"
             sx={{
               fontWeight: 600,
               color: theme.palette.primary.main,
-              minWidth: '300px',
               textAlign: 'center'
             }}
           >
-            {format(startDate, 'MMMM yyyy', { locale: tr })} - {format(addMonths(startDate, 1), 'MMMM yyyy', { locale: tr })}
+            📅 10 Şubat 2026 - 31 Mart 2026 Tarih Aralığı
           </Typography>
-          <IconButton
-            onClick={handleNextMonth}
-            sx={{
-              color: theme.palette.primary.main,
-              '&:hover': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.1)
-              }
-            }}
-          >
-            <ChevronRightIcon />
-          </IconButton>
         </Box>
 
-        <Box sx={{ mb: 2 }}>
-        <Paper
-          elevation={1}
-          sx={{
-            p: 2,
-            mb: 2,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 2
-          }}
-        >
-          {/* Kişi Bilgileri */}
-          <Box sx={{ mb: 0.5 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: theme.palette.primary.main }}>
-              👤 Kişi Bilgileri
-            </Typography>
-            <Stack direction="column" spacing={1.5}>
-              <TextField
-                label="İsim Soyisim"
-                value={localGuestName}
-                onChange={(e) => setLocalGuestName(e.target.value)}
-                onBlur={handleGuestNameBlur}
-                fullWidth
-                required
-                size="small"
-              />
-              <TextField
-                label="Telefon"
-                value={localGuestPhone}
-                onChange={(e) => setLocalGuestPhone(e.target.value)}
-                onBlur={handleGuestPhoneBlur}
-                fullWidth
-                required
-                size="small"
-              />
-            </Stack>
-          </Box>
-
-          {/* Konuk Sayısı */}
-          <Box sx={{ mb: 0.5 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: theme.palette.primary.main }}>
-              👥 Konuk Sayısı
-            </Typography>
-            <Stack direction="column" spacing={1.5}>
-              <TextField
-                label="Yetişkin Sayısı"
-                type="number"
-                value={localAdultCount}
-                onChange={(e) => setLocalAdultCount(e.target.value)}
-                onBlur={handleAdultCountBlur}
-                fullWidth
-                inputProps={{ min: 0 }}
-                size="small"
-              />
-              <TextField
-                label="Çocuk Sayısı"
-                type="number"
-                value={localChildCount}
-                onChange={(e) => setLocalChildCount(e.target.value)}
-                onBlur={handleChildCountBlur}
-                fullWidth
-                inputProps={{ min: 0 }}
-                size="small"
-              />
-            </Stack>
-          </Box>
-
-          {/* Ödeme Bilgileri */}
-          <Box sx={{ mb: 0.5 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: theme.palette.primary.main }}>
-              💰 Ödeme Bilgileri
-            </Typography>
-            <Stack direction="column" spacing={1.5}>
-              <TextField
-                label="Ödenecek Tutar"
-                type="number"
-                value={localAmountDue}
-                onChange={(e) => setLocalAmountDue(e.target.value)}
-                onBlur={handleAmountDueBlur}
-                fullWidth
-                inputProps={{ min: 0 }}
-                size="small"
-              />
-              <TextField
-                label="Ödenen Tutar"
-                type="number"
-                value={localAmountPaid}
-                onChange={(e) => setLocalAmountPaid(e.target.value)}
-                onBlur={handleAmountPaidBlur}
-                fullWidth
-                inputProps={{ min: 0 }}
-                size="small"
-              />
-              <TextField
-                label="Ödeme Tarihi"
-                type="date"
-                value={localPaymentDate}
-                onChange={(e) => setLocalPaymentDate(e.target.value)}
-                onBlur={handlePaymentDateBlur}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-                size="small"
-              />
-            </Stack>
-          </Box>
-
-          {/* Not */}
-          <Box sx={{ mb: 0.5 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: theme.palette.primary.main }}>
-              📝 Not
-            </Typography>
-            <TextField
-              label="Not"
-              value={localNote}
-              onChange={(e) => setLocalNote(e.target.value)}
-              onBlur={handleNoteBlur}
-              fullWidth
-              multiline
-              minRows={2}
-              size="small"
-            />
-          </Box>
-        </Paper>
-
-        {/* İşlem Butonları */}
-        <Box sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          gap: 2,
-          mt: 1,
-          flexWrap: 'wrap'
-        }}>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleAddReservation}
-            disabled={selectedCells.length === 0}
-            sx={{
-              fontWeight: 600,
-              '&:hover': {
-                transform: 'scale(1.02)'
-              },
-              transition: 'transform 0.2s ease'
-            }}
-          >
-            ✅ Rezerve Et
-          </Button>
-          <Button
-            variant="outlined"
-            color="error"
-            onClick={handleDeleteReservation}
-            disabled={selectedCells.length === 0}
-            sx={{
-              fontWeight: 600,
-              '&:hover': {
-                transform: 'scale(1.02)',
-                backgroundColor: alpha(theme.palette.error.main, 0.05)
-              },
-              transition: 'all 0.2s ease'
-            }}
-          >
-            🗑️ Sil
-          </Button>
-        </Box>
-        </Box>
-        
-        <TableContainer 
+        <TableContainer
           component={Paper}
-          sx={{ 
+          sx={{
             overflowX: 'auto',
             borderRadius: 2,
             boxShadow: theme.shadows[5],
+            mb: 3,
             '&::-webkit-scrollbar': {
               height: '8px',
             },
@@ -1557,57 +1258,233 @@ function AdminPanel() {
         </TableContainer>
 
         {/* Legend */}
-        <Box sx={{ 
-          display: 'flex', 
+        <Box sx={{
+          display: 'flex',
           justifyContent: 'center',
           flexWrap: 'wrap',
           gap: { xs: 2, sm: 4 },
-          mt: { xs: 1, sm: 2 }
+          mt: { xs: 1, sm: 2 },
+          mb: 2
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box sx={{ 
-              width: { xs: 12, sm: 16 }, 
-              height: { xs: 12, sm: 16 }, 
+            <Box sx={{
+              width: { xs: 12, sm: 16 },
+              height: { xs: 12, sm: 16 },
               backgroundColor: alpha(theme.palette.error.main, 0.9),
-              borderRadius: '50%' 
+              borderRadius: '50%'
             }} />
             <Typography variant="body2" color="text.secondary">
               Rezerve
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box sx={{ 
-              width: { xs: 12, sm: 16 }, 
-              height: { xs: 12, sm: 16 }, 
+            <Box sx={{
+              width: { xs: 12, sm: 16 },
+              height: { xs: 12, sm: 16 },
               backgroundColor: alpha(theme.palette.grey[500], 0.9),
-              borderRadius: '50%' 
+              borderRadius: '50%'
             }} />
             <Typography variant="body2" color="text.secondary">
               Geçmiş Tarih
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box sx={{ 
-              width: { xs: 12, sm: 16 }, 
-              height: { xs: 12, sm: 16 }, 
+            <Box sx={{
+              width: { xs: 12, sm: 16 },
+              height: { xs: 12, sm: 16 },
               backgroundColor: alpha(theme.palette.primary.main, 0.05),
-              borderRadius: '50%' 
+              borderRadius: '50%'
             }} />
             <Typography variant="body2" color="text.secondary">
               Hafta Sonu
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box sx={{ 
-              width: { xs: 12, sm: 16 }, 
-              height: { xs: 12, sm: 16 }, 
+            <Box sx={{
+              width: { xs: 12, sm: 16 },
+              height: { xs: 12, sm: 16 },
               backgroundColor: alpha(theme.palette.primary.main, 0.7),
-              borderRadius: '50%' 
+              borderRadius: '50%'
             }} />
             <Typography variant="body2" color="text.secondary">
               Seçili Tarihler
             </Typography>
           </Box>
+        </Box>
+
+        {/* Kişi Bilgileri Formu */}
+        <Box sx={{ mb: 2 }}>
+        <Paper
+          elevation={1}
+          sx={{
+            p: 2,
+            mb: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2
+          }}
+        >
+          {/* Kişi Bilgileri */}
+          <Box sx={{ mb: 0.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: theme.palette.primary.main }}>
+              👤 Kişi Bilgileri
+            </Typography>
+            <Stack direction="column" spacing={1.5}>
+              <TextField
+                label="İsim Soyisim"
+                value={localGuestName}
+                onChange={(e) => setLocalGuestName(e.target.value)}
+                onBlur={handleGuestNameBlur}
+                fullWidth
+                required
+                size="small"
+                disabled={selectedCells.length === 0}
+              />
+              <TextField
+                label="Telefon"
+                value={localGuestPhone}
+                onChange={(e) => setLocalGuestPhone(e.target.value)}
+                onBlur={handleGuestPhoneBlur}
+                fullWidth
+                required
+                size="small"
+                disabled={selectedCells.length === 0}
+              />
+            </Stack>
+          </Box>
+
+          {/* Konuk Sayısı */}
+          <Box sx={{ mb: 0.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: theme.palette.primary.main }}>
+              👥 Konuk Sayısı
+            </Typography>
+            <Stack direction="column" spacing={1.5}>
+              <TextField
+                label="Yetişkin Sayısı"
+                type="number"
+                value={localAdultCount}
+                onChange={(e) => setLocalAdultCount(e.target.value)}
+                onBlur={handleAdultCountBlur}
+                fullWidth
+                inputProps={{ min: 0 }}
+                size="small"
+                disabled={selectedCells.length === 0}
+              />
+              <TextField
+                label="Çocuk Sayısı"
+                type="number"
+                value={localChildCount}
+                onChange={(e) => setLocalChildCount(e.target.value)}
+                onBlur={handleChildCountBlur}
+                fullWidth
+                inputProps={{ min: 0 }}
+                size="small"
+                disabled={selectedCells.length === 0}
+              />
+            </Stack>
+          </Box>
+
+          {/* Ödeme Bilgileri */}
+          <Box sx={{ mb: 0.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: theme.palette.primary.main }}>
+              💰 Ödeme Bilgileri
+            </Typography>
+            <Stack direction="column" spacing={1.5}>
+              <TextField
+                label="Ödenecek Tutar"
+                type="number"
+                value={localAmountDue}
+                onChange={(e) => setLocalAmountDue(e.target.value)}
+                onBlur={handleAmountDueBlur}
+                fullWidth
+                inputProps={{ min: 0 }}
+                size="small"
+                disabled={selectedCells.length === 0}
+              />
+              <TextField
+                label="Ödenen Tutar"
+                type="number"
+                value={localAmountPaid}
+                onChange={(e) => setLocalAmountPaid(e.target.value)}
+                onBlur={handleAmountPaidBlur}
+                fullWidth
+                inputProps={{ min: 0 }}
+                size="small"
+                disabled={selectedCells.length === 0}
+              />
+              <TextField
+                label="Ödeme Tarihi"
+                type="date"
+                value={localPaymentDate}
+                onChange={(e) => setLocalPaymentDate(e.target.value)}
+                onBlur={handlePaymentDateBlur}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+                size="small"
+                disabled={selectedCells.length === 0}
+              />
+            </Stack>
+          </Box>
+
+          {/* Not */}
+          <Box sx={{ mb: 0.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: theme.palette.primary.main }}>
+              📝 Not
+            </Typography>
+            <TextField
+              label="Not"
+              value={localNote}
+              onChange={(e) => setLocalNote(e.target.value)}
+              onBlur={handleNoteBlur}
+              fullWidth
+              multiline
+              minRows={2}
+              size="small"
+              disabled={selectedCells.length === 0}
+            />
+          </Box>
+        </Paper>
+
+        {/* İşlem Butonları */}
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: 2,
+          mt: 1,
+          flexWrap: 'wrap'
+        }}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleAddReservation}
+            disabled={selectedCells.length === 0}
+            sx={{
+              fontWeight: 600,
+              '&:hover': {
+                transform: 'scale(1.02)'
+              },
+              transition: 'transform 0.2s ease'
+            }}
+          >
+            ✅ Rezerve Et
+          </Button>
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={handleDeleteReservation}
+            disabled={selectedCells.length === 0}
+            sx={{
+              fontWeight: 600,
+              '&:hover': {
+                transform: 'scale(1.02)',
+                backgroundColor: alpha(theme.palette.error.main, 0.05)
+              },
+              transition: 'all 0.2s ease'
+            }}
+          >
+            🗑️ Sil
+          </Button>
+        </Box>
         </Box>
       </Box>
     </Container>

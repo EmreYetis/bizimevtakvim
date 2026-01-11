@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   Box, 
   Container, 
@@ -280,12 +280,10 @@ function CustomerView() {
     return months;
   })();
 
-  const dateRange = visibleMonths.flatMap(month =>
-    eachDayOfInterval({
-      start: startOfMonth(month),
-      end: endOfMonth(month)
-    })
-  );
+  const dateRange = useMemo(() => eachDayOfInterval({
+    start: new Date('2026-02-10'),
+    end: new Date('2026-03-31')
+  }), []);
 
   // Tablo scroll olayını dinle
   const handleScroll = useCallback((e) => {
@@ -414,10 +412,10 @@ function CustomerView() {
           </Typography>
         </Box>
 
-        {/* Calendar Navigation */}
-        <Paper 
-          elevation={0} 
-          sx={{ 
+        {/* Tarih Aralığı Bilgisi */}
+        <Paper
+          elevation={0}
+          sx={{
             p: { xs: 1.5, sm: 2 },
             backgroundColor: alpha(theme.palette.primary.main, 0.05),
             borderRadius: 2
@@ -427,76 +425,16 @@ function CustomerView() {
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            gap: { xs: 2, sm: 4 },
-            position: 'relative'
+            textAlign: 'center'
           }}>
-            <IconButton 
-              onClick={handlePrevMonth}
-              disabled={isPrevMonthDisabled()}
-              sx={{ 
-                color: theme.palette.primary.main,
-                '&.Mui-disabled': {
-                  color: theme.palette.action.disabled
-                },
-                '&:hover': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.1)
-                }
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 600,
+                color: theme.palette.primary.main
               }}
             >
-              <ChevronLeftIcon />
-            </IconButton>
-
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: { xs: 1, sm: 2 }
-            }}>
-              <MonthIndicator 
-                date={visibleMonths[0] || startDate} 
-                isActive={activeMonth === 0}
-              />
-              
-              <Typography sx={{ 
-                color: theme.palette.text.secondary,
-                fontSize: { xs: '1.2rem', sm: '1.5rem' },
-                fontWeight: 'bold',
-                mx: { xs: 0.5, sm: 1 }
-              }}>
-                -
-              </Typography>
-              
-              <MonthIndicator 
-                date={visibleMonths[1] || addMonths(visibleMonths[0] || startDate, 1)} 
-                isActive={activeMonth === 1 && !!visibleMonths[1]}
-              />
-            </Box>
-
-            <IconButton onClick={handleNextMonth}>
-              <ChevronRightIcon />
-            </IconButton>
-          </Box>
-
-          {/* Aktif Ay Göstergesi */}
-          <Box sx={{
-            display: 'flex',
-            justifyContent: 'center',
-            mt: { xs: 1, sm: 1.5 },
-            gap: 1
-          }}>
-            <Box sx={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: theme.palette.primary.main
-            }} />
-            <Typography variant="caption" sx={{ 
-              color: theme.palette.text.secondary,
-              fontSize: { xs: '0.7rem', sm: '0.8rem' }
-            }}>
-              {activeMonth === 0 ? 
-                format(startDate, 'MMMM', { locale: tr }) : 
-                format(addMonths(startDate, 1), 'MMMM', { locale: tr })} 
-                  -Ayı-Gösteriliyor!
+              📅 10 Şubat 2026 - 31 Mart 2026 Tarih Aralığı
             </Typography>
           </Box>
         </Paper>
