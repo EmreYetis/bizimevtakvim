@@ -678,12 +678,35 @@ function AdminPanel() {
       cellsForUpdate = [...reservationCells, ...extraCells];
     }
 
+    // Blokaj tablosundan seçili olan tarihler (sadece selectedCells)
+    const selectedDateStrings = [...new Set(
+      selectedCells.map(cell => cell.date.toISOString().split('T')[0])
+    )].sort();
     const uniqueDateStrings = [...new Set(
       cellsForUpdate.map(cell => cell.date.toISOString().split('T')[0])
     )].sort();
-    const stayStart = uniqueDateStrings[0];
-    const stayEnd = uniqueDateStrings[uniqueDateStrings.length - 1];
-    const stayLengthDays = uniqueDateStrings.length;
+
+    // Blokaj tablosundan seçili tarihler her zaman giriş/çıkış için kullanılır
+    // Benzersiz tarihleri al (çünkü aynı tarihte birden fazla oda seçilebilir)
+    const uniqueDates = [...new Set(selectedCells.map(cell => {
+      const cellDate = new Date(cell.date);
+      return new Date(cellDate.getTime() - (cellDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+    }))].sort();
+
+    // İlk seçilen benzersiz tarih = Giriş tarihi
+    const stayStart = uniqueDates[0];
+
+    // Son seçilen benzersiz tarihten 1 gün sonrası = Çıkış tarihi
+    const lastSelectedDate = uniqueDates[uniqueDates.length - 1];
+    const stayEnd = new Date(new Date(lastSelectedDate).getTime() + 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    // Benzersiz tarih sayısı = Gece sayısı
+    const stayLengthDays = uniqueDates.length;
+
+
+    console.log('stayStart:', stayStart);
+    console.log('stayEnd:', stayEnd);
+    console.log('stayLengthDays:', stayLengthDays);
     const reservationId = existingReservationId || `res_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const paymentDateValue = paymentDate ? paymentDate : null;
     const createdAt = existingCreatedAt || new Date().toISOString();
