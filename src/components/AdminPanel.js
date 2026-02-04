@@ -703,12 +703,8 @@ function AdminPanel() {
     // Benzersiz tarih sayısı = Gece sayısı
     const stayLengthDays = uniqueDates.length;
 
-
-    console.log('stayStart:', stayStart);
-    console.log('stayEnd:', stayEnd);
-    console.log('stayLengthDays:', stayLengthDays);
-    const reservationId = existingReservationId || `res_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const paymentDateValue = paymentDate ? paymentDate : null;
+    // Her oda için ayrı reservationId tut (aynı odanın tüm günleri aynı id'yi kullanacak)
+    const roomReservationIds = {};
     const createdAt = existingCreatedAt || new Date().toISOString();
 
     try {
@@ -729,13 +725,52 @@ function AdminPanel() {
         const existingRooms = existingDoc.exists() ? existingDoc.data().rooms || [] : [];
 
         const newEntries = roomsForDate.map(room => {
-          // Existing rezervasyon için değerleri koru, yeni değer varsa güncelle
-          const existingAmountDue = existingReservationId && existingForInitial ? existingForInitial.amountDue : null;
-          const existingAmountPaid = existingReservationId && existingForInitial ? existingForInitial.amountPaid : null;
-          const existingPaymentDate = existingReservationId && existingForInitial ? existingForInitial.paymentDate : null;
-          const existingAdultCount = existingReservationId && existingForInitial ? existingForInitial.adultCount : null;
-          const existingChildCount = existingReservationId && existingForInitial ? existingForInitial.childCount : null;
-          const existingNote = existingReservationId && existingForInitial ? existingForInitial.note : null;
+          // Bu oda için mevcut bir kayıt var mı (aynı tarih + oda)
+          const existingEntryForRoom = existingRooms.find(entry => {
+            if (typeof entry !== 'object') return false;
+            return entry.room === room;
+          });
+
+          // Her oda için ayrı reservationId belirle
+          let reservationIdForRoom = roomReservationIds[room];
+          if (!reservationIdForRoom) {
+            if (existingEntryForRoom?.reservationId) {
+              reservationIdForRoom = existingEntryForRoom.reservationId;
+            } else {
+              reservationIdForRoom = `res_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            }
+            roomReservationIds[room] = reservationIdForRoom;
+          }
+
+          // Mevcut değerler (varsa) - mümkün olduğunca oda bazlı oku
+          const existingAmountDue =
+            typeof existingEntryForRoom?.amountDue === 'number'
+              ? existingEntryForRoom.amountDue
+              : (existingReservationId && existingForInitial ? existingForInitial.amountDue : null);
+
+          const existingAmountPaid =
+            typeof existingEntryForRoom?.amountPaid === 'number'
+              ? existingEntryForRoom.amountPaid
+              : (existingReservationId && existingForInitial ? existingForInitial.amountPaid : null);
+
+          const existingPaymentDate =
+            existingEntryForRoom?.paymentDate ||
+            (existingReservationId && existingForInitial ? existingForInitial.paymentDate : null);
+
+          const existingAdultCount =
+            typeof existingEntryForRoom?.adultCount === 'number'
+              ? existingEntryForRoom.adultCount
+              : (existingReservationId && existingForInitial ? existingForInitial.adultCount : null);
+
+          const existingChildCount =
+            typeof existingEntryForRoom?.childCount === 'number'
+              ? existingEntryForRoom.childCount
+              : (existingReservationId && existingForInitial ? existingForInitial.childCount : null);
+
+          const existingNote =
+            typeof existingEntryForRoom?.note === 'string'
+              ? existingEntryForRoom.note
+              : (existingReservationId && existingForInitial ? existingForInitial.note : null);
 
           return {
             room,
@@ -750,7 +785,7 @@ function AdminPanel() {
             stayStart,
             stayEnd,
             stayLengthDays,
-            reservationId,
+            reservationId: reservationIdForRoom,
             createdAt
           };
         });
