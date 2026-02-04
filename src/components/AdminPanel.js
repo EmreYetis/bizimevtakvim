@@ -661,22 +661,57 @@ function AdminPanel() {
       return;
     }
 
-    const initialCell = selectedCells[0];
-    const existingForInitial = initialCell 
-      ? findBookingForCell(initialCell.date, initialCell.room)
-      : null;
-    const existingReservationId = existingForInitial?.reservationId || null;
-    const existingCreatedAt = existingForInitial?.createdAt || null;
+    // Her oda için ayrı ayrı işlem yap - odalar birbirini etkilemesin
+    // Seçili hücreleri oda bazında grupla
+    const cellsByRoom = {};
+    selectedCells.forEach(cell => {
+      if (!cellsByRoom[cell.room]) {
+        cellsByRoom[cell.room] = [];
+      }
+      cellsByRoom[cell.room].push(cell);
+    });
 
-    let cellsForUpdate = [...selectedCells];
-    if (existingReservationId) {
-      const reservationCells = collectCellsForReservation(existingReservationId);
-      const reservationKeySet = new Set(reservationCells.map(getCellKey));
-      const extraCells = selectedCells.filter(
-        cell => !reservationKeySet.has(getCellKey(cell))
-      );
-      cellsForUpdate = [...reservationCells, ...extraCells];
-    }
+    // Her oda için, o odanın seçili hücrelerine ait mevcut rezervasyonu bul
+    const roomReservationData = {};
+    Object.keys(cellsByRoom).forEach(room => {
+      const roomCells = cellsByRoom[room];
+      // Bu odanın ilk seçili hücresindeki mevcut rezervasyonu bul
+      const firstCell = roomCells[0];
+      const existingForRoom = findBookingForCell(firstCell.date, firstCell.room);
+      if (existingForRoom?.reservationId) {
+        // Bu odanın tüm rezervasyon hücrelerini topla (sadece bu oda için)
+        const allCellsForRoom = collectCellsForReservation(existingForRoom.reservationId)
+          .filter(cell => cell.room === room); // Sadece bu odaya ait olanları al
+        roomReservationData[room] = {
+          reservationId: existingForRoom.reservationId,
+          createdAt: existingForRoom.createdAt,
+          allCells: allCellsForRoom
+        };
+      } else {
+        roomReservationData[room] = {
+          reservationId: null,
+          createdAt: null,
+          allCells: []
+        };
+      }
+    });
+
+    // Her oda için güncellenecek hücreleri belirle
+    const cellsForUpdate = [];
+    Object.keys(cellsByRoom).forEach(room => {
+      const roomCells = cellsByRoom[room];
+      const roomData = roomReservationData[room];
+      
+      if (roomData.reservationId && roomData.allCells.length > 0) {
+        // Mevcut rezervasyon varsa, o odanın tüm hücrelerini + yeni seçilenleri birleştir
+        const existingKeys = new Set(roomData.allCells.map(getCellKey));
+        const newCells = roomCells.filter(cell => !existingKeys.has(getCellKey(cell)));
+        cellsForUpdate.push(...roomData.allCells, ...newCells);
+      } else {
+        // Yeni rezervasyon - sadece seçili hücreleri kullan
+        cellsForUpdate.push(...roomCells);
+      }
+    });
 
     // Blokaj tablosundan seçili olan tarihler (sadece selectedCells)
     const selectedDateStrings = [...new Set(
@@ -703,10 +738,6 @@ function AdminPanel() {
     // Benzersiz tarih sayısı = Gece sayısı
     const stayLengthDays = uniqueDates.length;
 
-    // Her oda için ayrı reservationId tut (aynı odanın tüm günleri aynı id'yi kullanacak)
-    const roomReservationIds = {};
-    const createdAt = existingCreatedAt || new Date().toISOString();
-
     try {
       // Seçili hücreleri tarihlere göre grupla
       const groupedByDate = cellsForUpdate.reduce((acc, cell) => {
@@ -731,46 +762,52 @@ function AdminPanel() {
             return entry.room === room;
           });
 
-          // Her oda için ayrı reservationId belirle
-          let reservationIdForRoom = roomReservationIds[room];
-          if (!reservationIdForRoom) {
-            if (existingEntryForRoom?.reservationId) {
-              reservationIdForRoom = existingEntryForRoom.reservationId;
-            } else {
-              reservationIdForRoom = `res_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-            }
-            roomReservationIds[room] = reservationIdForRoom;
+          // Her oda için ayrı reservationId belirle - roomReservationData'dan al
+          const roomData = roomReservationData[room];
+          let reservationIdForRoom;
+          let createdAtForRoom;
+          
+          if (roomData?.reservationId) {
+            // Mevcut rezervasyon varsa, aynı ID'yi kullan
+            reservationIdForRoom = roomData.reservationId;
+            createdAtForRoom = roomData.createdAt || new Date().toISOString();
+          } else if (existingEntryForRoom?.reservationId) {
+            // Bu tarihte bu oda için mevcut bir rezervasyon var
+            reservationIdForRoom = existingEntryForRoom.reservationId;
+            createdAtForRoom = existingEntryForRoom.createdAt || new Date().toISOString();
+          } else {
+            // Yeni rezervasyon - yeni ID oluştur
+            reservationIdForRoom = `res_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            createdAtForRoom = new Date().toISOString();
           }
 
-          // Mevcut değerler (varsa) - mümkün olduğunca oda bazlı oku
+          // Mevcut değerler (varsa) - önce bu tarih+oda için, yoksa roomData'dan
           const existingAmountDue =
             typeof existingEntryForRoom?.amountDue === 'number'
               ? existingEntryForRoom.amountDue
-              : (existingReservationId && existingForInitial ? existingForInitial.amountDue : null);
+              : null;
 
           const existingAmountPaid =
             typeof existingEntryForRoom?.amountPaid === 'number'
               ? existingEntryForRoom.amountPaid
-              : (existingReservationId && existingForInitial ? existingForInitial.amountPaid : null);
+              : null;
 
-          const existingPaymentDate =
-            existingEntryForRoom?.paymentDate ||
-            (existingReservationId && existingForInitial ? existingForInitial.paymentDate : null);
+          const existingPaymentDate = existingEntryForRoom?.paymentDate || null;
 
           const existingAdultCount =
             typeof existingEntryForRoom?.adultCount === 'number'
               ? existingEntryForRoom.adultCount
-              : (existingReservationId && existingForInitial ? existingForInitial.adultCount : null);
+              : null;
 
           const existingChildCount =
             typeof existingEntryForRoom?.childCount === 'number'
               ? existingEntryForRoom.childCount
-              : (existingReservationId && existingForInitial ? existingForInitial.childCount : null);
+              : null;
 
           const existingNote =
             typeof existingEntryForRoom?.note === 'string'
               ? existingEntryForRoom.note
-              : (existingReservationId && existingForInitial ? existingForInitial.note : null);
+              : null;
 
           return {
             room,
@@ -786,7 +823,7 @@ function AdminPanel() {
             stayEnd,
             stayLengthDays,
             reservationId: reservationIdForRoom,
-            createdAt
+            createdAt: createdAtForRoom
           };
         });
 
