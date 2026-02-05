@@ -809,13 +809,20 @@ function AdminPanel() {
               ? existingEntryForRoom.note
               : null;
 
+          const parsedAmountDue =
+            localAmountDue === '' ? null : Number(localAmountDue);
+          const parsedAmountPaid =
+            localAmountPaid === '' ? null : Number(localAmountPaid);
+          const normalizedPaymentDate = localPaymentDate || null;
+
           return {
             room,
             guestName: localGuestName.trim(),
             guestPhone: localGuestPhone.trim(),
-            amountDue: localAmountDue ? Number(localAmountDue) : (existingAmountDue || 0),
-            amountPaid: localAmountPaid ? Number(localAmountPaid) : (existingAmountPaid || 0),
-            paymentDate: localPaymentDate || existingPaymentDate || null,
+            // Kullanıcı alanı boşaltırsa null yazarak önceki değeri sıfırla
+            amountDue: parsedAmountDue,
+            amountPaid: parsedAmountPaid,
+            paymentDate: normalizedPaymentDate,
             adultCount: localAdultCount ? Number(localAdultCount) : (existingAdultCount || 2),
             childCount: localChildCount ? Number(localChildCount) : (existingChildCount || 0),
             note: localNote.trim() || (existingNote || ''),
